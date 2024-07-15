@@ -1,0 +1,17 @@
+{
+  "name": "zig-js-interplay",
+  "version": "0.0.1",
+  "description": "",
+  "main": "dist/interplay.js",
+  "scripts": {
+    "build": "pnpm build:bundle && pnpm build:bundle.min",
+    "build:bundle": "esbuild src/interplay.ts --bundle --sourcemap --format=esm --outfile=dist/interplay.js",
+    "build:bundle.min": "esbuild src/interplay.ts --bundle --minify --sourcemap --format=esm --outfile=dist/interplay.min.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "esbuild": "^0.23.0"
+  }
+}

@@ -1,0 +1,10 @@
+{
+    "compilerOptions": {
+        "module": "ESNext",
+        "target": "ESNext",
+        "noFallthroughCasesInSwitch": false
+    },
+    "files": [
+        "src/interplay.ts"
+    ]
+}

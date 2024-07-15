@@ -46,7 +46,7 @@ Supported browser versions (stand 2024-07-15):
 
 ![GitHub file size in bytes](https://img.shields.io/github/size/oltdaniel/zig-js-interplay/example%2Fmain.wasm)
 
-First, add this repo as an dependency to your Zon file with `zig fetch URL_TODO --save`.
+First, add this repo as an dependency to your Zon file with `zig fetch https://github.com/oltdaniel/zig-js-interplay/archive/COMMITSHA.tar.gz --save`.
 
 And add the following code to add this repo as a module you can import to your `build.zig`:
 
@@ -74,7 +74,7 @@ You can simply import the module within your source. The current bundle size can
 
 ```html
 <script type="module">
-    import InterplayInstance from 'SOME_URL/dist/interplay.min.js';
+    import InterplayInstance from 'https://cdn.jsdelivr.net/gh/oltdaniel/zig-js-interplay/dist/interplay.min.js';
 </script>
 ```
 

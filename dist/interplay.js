@@ -100,9 +100,16 @@ var InterplayInstance = class {
    * @returns parsed Interplay Type from the return value of that function
    */
   #wrappedCall(func, ...args) {
-    const wasmArgs = args.map((a) => this.#encodeInterplayType(a)).flat();
-    const r = func(...wasmArgs);
-    return r ? this.#decodeInterplayType(r).value : void 0;
+    const wasmArgs = args.map((a) => this.#encodeInterplayType(a));
+    const r = func(...wasmArgs.flat());
+    for (let i = 0; i < wasmArgs.length; i++) {
+      this.#freeEncodedInterplayType(wasmArgs[i]);
+    }
+    const wasmReturn = r ? this.#decodeInterplayType(r).value : void 0;
+    if (wasmReturn) {
+      this.#freeEncodedInterplayType(r);
+    }
+    return wasmReturn;
   }
   /**
    * Each InterplayType in Zig is a packed struct of size u128 of which the first 4bit are its type notation. The
@@ -162,8 +169,11 @@ var InterplayInstance = class {
     }
   }
   /**
+   * Decode a given Interplay Type to its JavaScript value. Any allocations done to the interplay type can be freed
+   * after this call, as the return value does not depend on the origin value.
    * 
-   * @param value 
+   * @param value interplay type to decode
+   * @returns decoded interplay type as javascript value
    */
   #decodeInterplayType(value) {
     const ipl = BigInt.asUintN(64, value[0]) | BigInt.asUintN(64, value[1]) << 64n;
@@ -189,7 +199,7 @@ var InterplayInstance = class {
       }
       case 5 /* bytes */: {
         const buf = this.#decodeBytesLikeType(details);
-        return { type, value: buf };
+        return { type, value: buf.slice() };
       }
       case 6 /* string */: {
         const buf = this.#decodeBytesLikeType(details);
@@ -240,9 +250,12 @@ var InterplayInstance = class {
     }
   }
   /**
+   * Encode a JavaScript value to the corresponding interplay type. This may require allocation in memory in order to
+   * transfer the full value to the WASM environment. There is no automatic free and this needs to be done manually
+   * after the interplay type has been used.
    * 
-   * @param value 
-   * @returns 
+   * @param value javascript value to encode
+   * @returns encoded javascript value as interplay type
    */
   #encodeInterplayType(value) {
     const iplType = this.#mapValueToInterplayTypeId(value);
@@ -309,6 +322,14 @@ var InterplayInstance = class {
     let r = [BigInt.asUintN(64, fullInfo), BigInt.asUintN(64, fullInfo >> 64n)];
     return r;
   }
+  /**
+   * This is a shortcut to easily read bytes like interplay types from memory. It is important to note, that this function
+   * does no return a copy of the memory section, but rather points at it. If you return this and modify it without the purpose
+   * of modifying it in the actual memory, please create a copy of this buffer.
+   * 
+   * @param value interplay type that implements the bytes like interface
+   * @returns the buffer pointing to the memory section
+   */
   #decodeBytesLikeType(value) {
     const { ptr, len } = this.#extractBitSections(value, [
       ["ptr", 32],
@@ -316,11 +337,74 @@ var InterplayInstance = class {
     ]);
     return new Uint8Array(this.#wasm.memory.buffer, Number(ptr), Number(len));
   }
+  /**
+   * This is a shortcut to easily copy bytes like interplay types to memory. This copies the given buffer and the given buffer
+   * is free to be cleared/freed or used otherwise after this call.
+   * 
+   * @param buf to copy as bytes like interplay type to wasm memory
+   * @returns encoded interplay type for this buffer
+   */
   #encodeBytesLikeType(buf) {
     const len = buf.byteLength;
     const ptr = this.#wasm.malloc(len);
     new Uint8Array(this.#wasm.memory.buffer, ptr, len).set(buf);
     return BigInt.asUintN(32, BigInt(len)) << 32n | BigInt.asUintN(32, BigInt(ptr));
+  }
+  /**
+   * As soon as a call to the WASM function os over or the return has been decoded into a JavaScript value, any allocations
+   * done for those types, on both Zig and JS side, will be freed with this function.
+   * 
+   * @param value the interplay type to free the allocated resources for
+   */
+  #freeEncodedInterplayType(value) {
+    const ipl = BigInt.asUintN(64, value[0]) | BigInt.asUintN(64, value[1]) << 64n;
+    const { type, details } = this.#extractBitSections(ipl, [
+      ["type", 4],
+      ["details", 124]
+    ]);
+    switch (Number(type)) {
+      case 0 /* void */:
+      case 1 /* bool */:
+      case 2 /* int */:
+      case 3 /* uint */:
+      case 4 /* float */:
+        break;
+      case 5 /* bytes */:
+      case 6 /* string */:
+      case 7 /* json */: {
+        const { ptr, len } = this.#extractBitSections(details, [
+          ["ptr", 32],
+          ["len", 32]
+        ]);
+        this.#wasm.free(Number(ptr), Number(len));
+        break;
+      }
+      case 8 /* function */: {
+        const { ptr, origin } = this.#extractBitSections(details, [
+          ["ptr", 32],
+          ["origin", 1]
+        ]);
+        if (origin === 1n) {
+          delete this.#functionTable[Number(ptr)];
+        }
+        break;
+      }
+      case 9 /* array */: {
+        const { ptr, len } = this.#extractBitSections(details, [
+          ["ptr", 32],
+          ["len", 32]
+        ]);
+        const tempBuf = new BigUint64Array(this.#wasm.memory.buffer, Number(ptr), Number(len * 2n));
+        for (let i = 0; i < len; i++) {
+          const iplVariable = Array.from(tempBuf.subarray(i * 2, (i + 1) * 2));
+          this.#freeEncodedInterplayType(iplVariable);
+        }
+        this.#wasm.free(Number(ptr), Number(len * 16n));
+        break;
+      }
+      default:
+        throw new Error(`Interplay type ${type} is not supported for decoding.`);
+    }
   }
 };
 var InterplayTypeId = /* @__PURE__ */ ((InterplayTypeId2) => {

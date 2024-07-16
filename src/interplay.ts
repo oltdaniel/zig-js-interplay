@@ -139,15 +139,29 @@ export default class InterplayInstance {
      * @returns parsed Interplay Type from the return value of that function
      */
     #wrappedCall(func: Function, ...args) {
-        // Encode the arguments to interplay types and flatten the array.
-        // The exported wasm functions only accept direct arguments, no arrays or other types.
-        const wasmArgs = args.map(a => this.#encodeInterplayType(a)).flat()
+        // Encode the arguments to interplay types.
+        const wasmArgs = args.map(a => this.#encodeInterplayType(a))
 
-        const r = func(...wasmArgs);
+        // Call the underlying function with a flatten array of the encoded types.
+        // The exported wasm functions only accept direct arguments, no arrays or other types.
+        const r = func(...wasmArgs.flat());
+
+        // Free each previosuly argument if there has been an allocation
+        for(let i = 0; i < wasmArgs.length; i++) {
+            this.#freeEncodedInterplayType(wasmArgs[i]);
+        }
+
+        // Correctly decode thhe optional return of the wasm function
+        const wasmReturn = r ? this.#decodeInterplayType(r).value : undefined;
+
+        // Free the interplay type of the return if present and after decoding
+        if(wasmReturn) {
+            this.#freeEncodedInterplayType(r);
+        }
 
         // There is no need for the wasm function to return something. So we only decode interplay types if we received
         // an actual value as a return.
-        return r ? this.#decodeInterplayType(r).value : undefined;
+        return wasmReturn;
     }
 
     /**
@@ -454,6 +468,82 @@ export default class InterplayInstance {
         new Uint8Array((this.#wasm.memory as unknown as Uint8Array).buffer, ptr, len).set(buf);
         // Encode the pointer and length
         return (BigInt.asUintN(32, BigInt(len)) << 32n) | BigInt.asUintN(32, BigInt(ptr));
+    }
+
+    /**
+     * As soon as a call to the WASM function os over or the return has been decoded into a JavaScript value, any allocations
+     * done for those types, on both Zig and JS side, will be freed with this function.
+     * 
+     * @param value the interplay type to free the allocated resources for
+     */
+    #freeEncodedInterplayType(value: InterplayType) {
+        // TODO: Currently the base of this function is repeating code of the #decodeInterplayType function and should be reworked.
+
+        // Merge the interplay type to a single u128 value
+        const ipl = BigInt.asUintN(64, value[0]) | (BigInt.asUintN(64, value[1]) << 64n);
+
+        // Extract type and value sections
+        const { type, details } = this.#extractBitSections(ipl, [
+            ['type', 4],
+            ['details', 124]
+        ]);
+
+        // Handle all the different types
+        switch (Number(type)) {
+            case InterplayTypeId.void:
+            case InterplayTypeId.bool:
+            case InterplayTypeId.int:
+            case InterplayTypeId.uint:
+            case InterplayTypeId.float:
+                // These types don't allocate any space and are only stored in the interplay type itself.
+                break;
+            case InterplayTypeId.bytes:
+            case InterplayTypeId.string:
+            case InterplayTypeId.json: {
+                // Extract pointer and length from the details
+                const { ptr, len } = this.#extractBitSections(details, [
+                    ['ptr', 32],
+                    ['len', 32],
+                ]);
+
+                (this.#wasm.free as Function)(Number(ptr), Number(len));
+                break;
+            }
+            case InterplayTypeId.function: {
+                // Extract pointer and origin of the function
+                const { ptr, origin } = this.#extractBitSections(details, [
+                    ['ptr', 32],
+                    ['origin', 1],
+                ])
+
+                // We only have to do a cleanup on a JavaScript function
+                if(origin === 1n) {
+                    delete this.#functionTable[Number(ptr)];
+                }
+                break;
+            }
+            case InterplayTypeId.array: {
+                // Extract pointer and number of items of the array
+                const { ptr, len } = this.#extractBitSections(details, [
+                    ['ptr', 32],
+                    ['len', 32],
+                ])
+
+                // View as array of u64, the length is twice as long as the number of items because len * 128bit = len * 2 * 64bit
+                const tempBuf = new BigUint64Array((this.#wasm.memory as unknown as Uint8Array).buffer, Number(ptr), Number(len * 2n));
+
+                for(let i = 0; i < len; i++) {
+                    const iplVariable = Array.from(tempBuf.subarray(i * 2, (i + 1) * 2)) as InterplayType;
+                    this.#freeEncodedInterplayType(iplVariable);
+                }
+
+                // Free the array itself (1item = 128 bit = 16 bytes)
+                (this.#wasm.free as Function)(Number(ptr), Number(len * 16n));
+                break;
+            }
+            default:
+                throw new Error(`Interplay type ${type} is not supported for decoding.`)
+        }
     }
 }
 

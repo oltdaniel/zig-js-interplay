@@ -131,8 +131,6 @@ python -m http.server 8000
 - [ ] Comment the zig file correctly and in full form
 - [ ] Maybe add some tests for the functionns on each side
 - [ ] Write documentation for the encoding and how each type works
-- [ ] Add memory allocation abstraction in JS
-- [ ] Free allocated encoded interplay types after JS call
 
 ## License
 

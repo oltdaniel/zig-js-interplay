@@ -5,6 +5,11 @@ var InterplayInstance = class {
    */
   #wasm = void 0;
   /**
+   * This will be overwritten by an exported global which indicates the protected memory which
+   * should not be freed.
+   */
+  #wasmMemoryDataPtr = 0;
+  /**
    * Central Text Decoder instance for converting bytes to string.
    */
   #textDecoder = new TextDecoder();
@@ -63,7 +68,9 @@ var InterplayInstance = class {
    * @param obj the instantiated WASM source for which this class has been created
    */
   #loadWasmObj(obj) {
+    console.log(obj);
     this.#wasm = obj.instance.exports;
+    this.#wasmMemoryDataPtr = obj.instance["$global0"];
     for (let name of Object.keys(this.#wasm).filter((n) => !["malloc", "free", "memory", "call"].includes(n))) {
       if (typeof this.#wasm[name] !== "function") {
         console.warn("We currently only make exported functions accessible through the Interplay Wrapper.");
@@ -305,7 +312,7 @@ var InterplayInstance = class {
       case 9 /* array */: {
         if (value.length == 0) break;
         const bufLen = value.length * 16;
-        const ptr = this.#wasm.malloc(bufLen);
+        const ptr = this.#wasmAlloc(bufLen);
         const tempBuf = new BigUint64Array(this.#wasm.memory.buffer, ptr, bufLen);
         for (let i = 0; i < value.length; i++) {
           const encodedEl = this.#encodeInterplayType(value[i]);
@@ -346,9 +353,30 @@ var InterplayInstance = class {
    */
   #encodeBytesLikeType(buf) {
     const len = buf.byteLength;
-    const ptr = this.#wasm.malloc(len);
+    const ptr = this.#wasmAlloc(len);
     new Uint8Array(this.#wasm.memory.buffer, ptr, len).set(buf);
     return BigInt.asUintN(32, BigInt(len)) << 32n | BigInt.asUintN(32, BigInt(ptr));
+  }
+  /**
+   * Memory allocation wrapper to simplfiy typing around it. See Zig wasm_allocator for details.
+   * 
+   * @param len the number of bytes to allocate
+   * @returns a ptr to the allocated space or -1 as an error
+   */
+  #wasmAlloc(len) {
+    const alloc = this.#wasm.alloc;
+    return alloc(Number(len) >>> 32);
+  }
+  /**
+   * Memory free wrapper to simplify typing around it. See Zig wasm_allocator for details.
+   * 
+   * @param ptr pointer of the memory space to free
+   * @param len length of the region to free
+   */
+  #wasmFree(ptr, len) {
+    const free = this.#wasm.free;
+    console.log("ptr", ptr, "len", len, "sp", this.#wasm.stackPointer());
+    free(Number(ptr) >>> 32, Number(len) >>> 32);
   }
   /**
    * As soon as a call to the WASM function os over or the return has been decoded into a JavaScript value, any allocations
@@ -376,7 +404,7 @@ var InterplayInstance = class {
           ["ptr", 32],
           ["len", 32]
         ]);
-        this.#wasm.free(Number(ptr), Number(len));
+        this.#wasmFree(ptr, len);
         break;
       }
       case 8 /* function */: {
@@ -399,7 +427,7 @@ var InterplayInstance = class {
           const iplVariable = Array.from(tempBuf.subarray(i * 2, (i + 1) * 2));
           this.#freeEncodedInterplayType(iplVariable);
         }
-        this.#wasm.free(Number(ptr), Number(len * 16n));
+        this.#wasmFree(ptr, len * 16n);
         break;
       }
       default:

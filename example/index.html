@@ -1,123 +1,125 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Example - Zig JS Interlay</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Example - Zig JS Interlay</title>
 </head>
+
 <body>
-    <input type="text" id="name" value="Daniel" required />
-    <button id="btn-greet">Greet</button>
-    
-    <script type="module">
-        import InterplayInstance from '/dist/interplay.min.js'
+  <input type="text" id="name" value="Daniel" required />
+  <button id="btn-greet">Greet</button>
 
-        const inst = await InterplayInstance.initializeFromUrl('main.wasm');
+  <script type="module">
+    import InterplayInstance from '/dist/interplay.min.js'
 
-        // === Interface Test ===
-      console.log("=== Testing silence");
-      inst.silence();
+    const inst = await InterplayInstance.initializeFromUrl('main.wasm');
 
-      console.log("=== Testing void type");
-      console.log(inst.testVoid());
-      inst.printVoid(undefined);
+    // === Interface Test ===
+    console.log("=== Testing silence");
+    inst.silence();
 
-      console.log("=== Testing bool type");
-      console.log(inst.testBool());
-      inst.printBool(true);
+    console.log("=== Testing void type");
+    console.log(inst.testVoid());
+    inst.printVoid(undefined);
 
-      console.log("=== Testing integer type");
-      console.log(inst.testInt());
-      inst.printInt(-12345);
+    console.log("=== Testing bool type");
+    console.log(inst.testBool());
+    inst.printBool(true);
 
-      console.log("=== Testing unsigned integer type");
-      console.log(inst.testUint());
-      inst.printUint(12345);
+    console.log("=== Testing integer type");
+    console.log(inst.testInt());
+    inst.printInt(-12345);
 
-      console.log("=== Testing float type");
-      console.log(inst.testFloat());
-      inst.printFloat(1.2345);
+    console.log("=== Testing unsigned integer type");
+    console.log(inst.testUint());
+    inst.printUint(12345);
 
-      console.log("=== Testing bytes type");
-      console.log(inst.testBytes());
-      inst.printBytes(new TextEncoder().encode("Hello World"));
+    console.log("=== Testing float type");
+    console.log(inst.testFloat());
+    inst.printFloat(1.2345);
 
-      console.log("=== Testing string type");
-      console.log(inst.testString());
-      inst.printString("Bye World");
+    console.log("=== Testing bytes type");
+    console.log(inst.testBytes());
+    inst.printBytes(new TextEncoder().encode("Hello World"));
 
-      console.log("=== Testing json type");
-      console.log(inst.testJSON());
-      inst.printJSON({ message: "Greetings" });
+    console.log("=== Testing string type");
+    console.log(inst.testString());
+    inst.printString("Bye World");
 
-      console.log("=== Testing zig function type");
-      const testFunctionRef = inst.testFunctionRef();
-      console.log(testFunctionRef());
-      console.log(inst.testFunction(testFunctionRef));
-      console.log(inst.testFunctionWithArgs(testFunctionRef, ["Hello", "from", "JS"]));
+    console.log("=== Testing json type");
+    console.log(inst.testJSON());
+    inst.printJSON({ message: "Greetings" });
 
-      console.log("=== Testing js function type");
-      console.log(inst.testFunction((...args) => {
-        console.log('I got called by reference from Zig with these arguments =', args)
-        return "JS says hello!"
-      }))
-      console.log(inst.testFunctionWithArgs((...args) => {
-        console.log('I got called by reference from Zig with these arguments =', args)
-        return "JS says hello!"
-      }, ["Hello", "from", "JS"]))
+    console.log("=== Testing zig function type");
+    const testFunctionRef = inst.testFunctionRef();
+    console.log(testFunctionRef());
+    console.log(inst.testFunction(testFunctionRef));
+    console.log(inst.testFunctionWithArgs(testFunctionRef, ["Hello", "from", "JS"]));
 
-      console.log("=== Testing greet");
-      console.log(inst.greet("Daniel"));
+    console.log("=== Testing js function type");
+    console.log(inst.testFunction((...args) => {
+      console.log('I got called by reference from Zig with these arguments =', args)
+      return "JS says hello!"
+    }))
+    console.log(inst.testFunctionWithArgs((...args) => {
+      console.log('I got called by reference from Zig with these arguments =', args)
+      return "JS says hello!"
+    }, ["Hello", "from", "JS"]))
 
-      // === Example Application ===
-      console.log("=== Testing example app");
+    console.log("=== Testing greet");
+    console.log(inst.greet("Daniel"));
 
-      function measure(label, func) {
-        const t0 = performance.now();
+    // === Example Application ===
+    console.log("=== Testing example app");
 
-        func();
-
-        const t1 = performance.now();
-        console.log(`${label} took ${t1 - t0}ms.`);
-      }
-
-      document.getElementById("btn-greet").addEventListener("click", () => {
-        measure("greet and hash", () => {
-          const name = document.getElementById("name").value;
-
-          console.log(inst.greet(name));
-
-          console.log(inst.blake2b(`this is a hashing input for ${name}`));
-        });
-      });
-
-      measure("initial greet and hash", () => {
-        console.log(inst.greet("Daniel"));
-
-        console.log(
-          inst.blake2b("This is just some hashing input to think about")
-        );
-      });
-
-      // === Hash Benchmark ===
-      console.log("=== Testing hash benchmark");
-
-      const ROUNDS = 1000;
-
+    function measure(label, func) {
       const t0 = performance.now();
 
-      for (let i = 0; i < ROUNDS; i++) {
-        // NOTE: There is an obvious performance penalty here, in JS and Zig,
-        //       compared to raw native performance.
-        inst.blake2b("Some hash");
-      }
+      func();
 
       const t1 = performance.now();
+      console.log(`${label} took ${t1 - t0}ms.`);
+    }
+
+    document.getElementById("btn-greet").addEventListener("click", () => {
+      measure("greet and hash", () => {
+        const name = document.getElementById("name").value;
+
+        console.log(inst.greet(name));
+
+        console.log(inst.blake2b(`this is a hashing input for ${name}`));
+      });
+    });
+
+    measure("initial greet and hash", () => {
+      console.log(inst.greet("Daniel"));
+
       console.log(
-        `Benchmark (hash with ${ROUNDS}rounds): total=${t1 - t0}ms; per round=${
-          (t1 - t0) / ROUNDS
-        }`
+        inst.blake2b("This is just some hashing input to think about")
       );
-    </script>
+    });
+
+    // === Hash Benchmark ===
+    console.log("=== Testing hash benchmark");
+
+    const ROUNDS = 1000;
+
+    const t0 = performance.now();
+
+    for (let i = 0; i < ROUNDS; i++) {
+      // NOTE: There is an obvious performance penalty here, in JS and Zig,
+      //       compared to raw native performance.
+      inst.blake2b("Some hash");
+    }
+
+    const t1 = performance.now();
+    console.log(
+      `Benchmark (hash with ${ROUNDS}rounds): total=${t1 - t0}ms; per round=${(t1 - t0) / ROUNDS
+      }`
+    );
+  </script>
 </body>
+
 </html>

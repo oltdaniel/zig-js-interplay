@@ -3,9 +3,9 @@ const std = @import("std");
 /// The internal allocator used by Interplay.
 pub const allocator = std.heap.wasm_allocator;
 
-// Expose the malloc function so we can pass large values
+// Expose the alloc function so we can pass large values
 // from js to the wasm environment.
-pub export fn malloc(length: usize) ?[*]u8 {
+pub export fn alloc(length: usize) ?[*]u8 {
     const buf = allocator.alloc(u8, length) catch return null;
 
     return buf.ptr;
@@ -150,9 +150,13 @@ pub fn BytesLike(comptime JsT: InterplayTypeId) type {
         _: u60 = 0,
 
         pub fn init(v: []const u8) @This() {
+            // Copy the value so it can be freed at any time
+            const cv = allocator.alloc(u8, v.len) catch @panic("Oops");
+            @memcpy(cv, v);
+
             return .{
-                .ptr = @intFromPtr(v.ptr),
-                .len = v.len,
+                .ptr = @intFromPtr(cv.ptr),
+                .len = cv.len,
             };
         }
 

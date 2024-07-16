@@ -409,7 +409,7 @@ export default class InterplayInstance {
                 if(value.length == 0) break;
                 // Calculate the length of the space we need to allocate (number of items * 128bit = number of items * 16bytes)
                 const bufLen = value.length * 16;
-                const ptr = (this.#wasm.malloc as Function)(bufLen);
+                const ptr = this.#wasmAlloc(bufLen);
                 // We can view this space as an array of InterplayTypesHalf
                 const tempBuf = new BigUint64Array((this.#wasm.memory as unknown as Uint8Array).buffer, ptr, bufLen);
                 // Encode each value of the given array and store its InterplayType in the allocated buffer
@@ -463,11 +463,39 @@ export default class InterplayInstance {
     #encodeBytesLikeType(buf: Uint8Array): bigint {
         const len = buf.byteLength;
         // Allocate space in the wasm memory where we can copy these bytes
-        const ptr = (this.#wasm.malloc as Function)(len);
+        const ptr = this.#wasmAlloc(len);
         // Copy the buffer data over to the wasm memory
         new Uint8Array((this.#wasm.memory as unknown as Uint8Array).buffer, ptr, len).set(buf);
         // Encode the pointer and length
         return (BigInt.asUintN(32, BigInt(len)) << 32n) | BigInt.asUintN(32, BigInt(ptr));
+    }
+
+    /**
+     * Memory allocation wrapper to simplfiy typing around it. See Zig wasm_allocator for details.
+     * 
+     * @param len the number of bytes to allocate
+     * @returns a ptr to the allocated space or -1 as an error
+     */
+    #wasmAlloc(len: number|bigint) {
+        if(Number(len) < 0) return -1;
+
+        const alloc = this.#wasm.alloc as (len: number) => number;
+
+        return alloc(Number(len) >>> 32);
+    }
+
+    /**
+     * Memory free wrapper to simplify typing around it. See Zig wasm_allocator for details.
+     * 
+     * @param ptr pointer of the memory space to free
+     * @param len length of the region to free
+     */
+    #wasmFree(ptr: number|bigint, len: number|bigint) {
+        if(Number(len) < 0) return;
+
+        const free = this.#wasm.free as (ptr: number, len: number) => void;
+
+        free(Number(ptr) >>> 32, Number(len) >>> 32)
     }
 
     /**
@@ -506,7 +534,7 @@ export default class InterplayInstance {
                     ['len', 32],
                 ]);
 
-                (this.#wasm.free as Function)(Number(ptr), Number(len));
+                this.#wasmFree(ptr, len);
                 break;
             }
             case InterplayTypeId.function: {
@@ -538,7 +566,7 @@ export default class InterplayInstance {
                 }
 
                 // Free the array itself (1item = 128 bit = 16 bytes)
-                (this.#wasm.free as Function)(Number(ptr), Number(len * 16n));
+                this.#wasmFree(ptr, len * 16n);
                 break;
             }
             default:

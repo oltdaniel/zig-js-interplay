@@ -20,6 +20,13 @@ export fn greet(name: ipl.String) ipl.String {
     // Return with Interplay String
     return ipl.String.init(greetMessage);
 }
+
+export fn testFunction(arg: ipl.Function) ipl.AnyType {
+    // Construct function arguments to pass
+    const args = ipl.Array.from(&.{ ipl.String.init("Hello").asAny(), ipl.String.init("World").asAny() });
+    // Call the function and return its return value
+    return arg.call(args);
+}
 ```
 
 ```js
@@ -28,6 +35,14 @@ import InterplayInstance from 'zig-js-interplay';
 const inst = new InterplayInstance.initializeFromUrl('main.wasm');
 
 console.log(inst.greet("Daniel"))
+// => prints "Hello Daniel!"
+
+console.log(inst.testFunction((...args) => {
+    console.log('I got called by reference from Zig with these arguments =', args)
+    return "JS says hello!"
+}))
+// => prints "I got called by reference from Zig with these arguments = ['Hello', 'World']"
+// => prints "JS says hello!"
 ```
 
 ## Installation

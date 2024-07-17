@@ -51,7 +51,7 @@ console.log(inst.testFunction((...args) => {
 
 The required browser versions can easily be extracted via [Browserlist](https://browsersl.ist/#q=supports+es6-module+and+supports+wasm+and+supports+wasm-bigint+and+supports+bigint) with the query `supports es6-module and supports wasm and supports wasm-bigint and supports bigint`. The support for `es6-modules` obviously only counts for the compiled JavaScript files this repo contains directly. All the other features must be supported in order to work correctly.
 
-Supported browser versions (stand 2024-07-15):
+Supported browser versions (as of 2024-07-15):
 - Chrome 85+
 - Safari iOS 14.5+
 - Safari 14.1

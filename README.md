@@ -54,7 +54,7 @@ The required browser versions can easily be extracted via [Browserlist](https://
 Supported browser versions (as of 2024-07-15):
 - Chrome 85+
 - Safari iOS 14.5+
-- Safari 14.1
+- Safari 14.1+
 - Firefox 78+
 
 ### Zig
@@ -99,7 +99,7 @@ Right now we don't publish this package to an registry. But you can simply add t
 
 > **TODO**: Write documentation.
 
-Currently, there are a lot of technical documents in the source code itself and in the example. Please read those for now instead.
+Currently, there are a lot of technical comments in the source code itself and in the example. Please read those for now instead.
 
 ### Articles
 
@@ -110,7 +110,7 @@ I've written two articles about my process to this library. Feel free to check t
 
 ## Development
 
-This project consists of programming languages. We require a JavaScript and Zig toolchain for full development on this project.
+This project consists of two programming languages. We require a JavaScript and Zig toolchain for full development on this project.
 
 - [Node.js](https://nodejs.org) for the JavaScript toolchain environment.
 - [PNPM](https://pnpm.io/) as JavaScript package manage of choice for this project.
@@ -141,7 +141,7 @@ zig build
 python -m http.server 8000
 ```
 
-### ToDO
+### ToDo
 
 - [ ] Comment the zig file correctly and in full form
 - [ ] Maybe add some tests for the functionns on each side
